@@ -25,7 +25,7 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum Cmd {
-    /// Search desktop entries (stub for now)
+    /// Search desktop entries
     Search {
         query: String,
         /// Max results to return (omit for unlimited)
@@ -40,7 +40,7 @@ pub enum Cmd {
         json: bool,
     },
 
-    /// List desktop entries (stub for now)
+    /// List desktop entries
     List {
         #[arg(long)]
         json: bool,
@@ -50,7 +50,7 @@ pub enum Cmd {
     Launch {
         desktop_id: String,
 
-        /// Optional Desktop Action id (from the `[Desktop Action ...]` group)
+        /// Optional Desktop Action id
         #[arg(long)]
         action: Option<String>,
     },
@@ -77,10 +77,10 @@ pub enum Cmd {
         json: bool,
     },
 
-    /// Start IPC daemon (background)
+    /// Start IPC daemon
     StartDaemon,
 
-    /// Stop IPC daemon (ask it to shutdown)
+    /// Stop IPC daemon
     StopDaemon,
 
     /// Check daemon status
@@ -89,7 +89,7 @@ pub enum Cmd {
         json: bool,
     },
 
-    /// Internal: run daemon server (foreground)
+    /// Internal: run daemon server
     #[command(hide = true)]
     RunDaemon,
 }
