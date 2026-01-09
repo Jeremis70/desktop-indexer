@@ -5,6 +5,7 @@ mod commands;
 mod daemon;
 mod daemon_client;
 mod desktop;
+mod empty_query;
 mod frequency;
 mod ipc;
 mod launch;

@@ -1,3 +1,4 @@
+use crate::empty_query::EmptyQueryMode;
 use crate::frequency::Usage;
 use crate::models::{DesktopEntryIndexed, DesktopEntryOut};
 use std::collections::HashMap;
@@ -28,11 +29,12 @@ pub fn normalize_query(query: &str) -> Vec<String> {
     tokens
 }
 
-pub fn search_entries_with_usage_map(
+pub fn search_entries_with_usage_map_and_empty_mode(
     entries: &[DesktopEntryIndexed],
     query: &str,
     limit: usize,
     usage: &HashMap<String, Usage>,
+    empty_mode: EmptyQueryMode,
 ) -> Vec<DesktopEntryOut> {
     if limit == 0 {
         return Vec::new();
@@ -40,7 +42,7 @@ pub fn search_entries_with_usage_map(
 
     let tokens = normalize_query(query);
     if tokens.is_empty() {
-        return Vec::new();
+        return empty_query_entries(entries, limit, usage, empty_mode);
     }
 
     // Keep only top-K scored candidates.
@@ -74,6 +76,51 @@ pub fn search_entries_with_usage_map(
     picked
         .into_iter()
         .map(|(_, idx)| entries[idx].out.clone())
+        .collect()
+}
+
+fn empty_query_entries(
+    entries: &[DesktopEntryIndexed],
+    limit: usize,
+    usage: &HashMap<String, Usage>,
+    empty_mode: EmptyQueryMode,
+) -> Vec<DesktopEntryOut> {
+    let mut picked: Vec<(usize, Usage)> = entries
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, e)| usage.get(&e.out.id).copied().map(|u| (idx, u)))
+        .filter(|(_idx, u)| match empty_mode {
+            EmptyQueryMode::Recency => u.last_used != 0,
+            EmptyQueryMode::Frequency => u.freq != 0,
+        })
+        .collect();
+
+    picked.sort_by(|(a_idx, a_u), (b_idx, b_u)| match empty_mode {
+        EmptyQueryMode::Recency => b_u
+            .last_used
+            .cmp(&a_u.last_used)
+            .then_with(|| b_u.freq.cmp(&a_u.freq))
+            .then_with(|| {
+                let a_name = entries[*a_idx].out.name.as_deref().unwrap_or("");
+                let b_name = entries[*b_idx].out.name.as_deref().unwrap_or("");
+                a_name.cmp(b_name)
+            })
+            .then_with(|| entries[*a_idx].out.id.cmp(&entries[*b_idx].out.id)),
+        EmptyQueryMode::Frequency => (b_u.freq)
+            .cmp(&a_u.freq)
+            .then_with(|| b_u.last_used.cmp(&a_u.last_used))
+            .then_with(|| {
+                let a_name = entries[*a_idx].out.name.as_deref().unwrap_or("");
+                let b_name = entries[*b_idx].out.name.as_deref().unwrap_or("");
+                a_name.cmp(b_name)
+            })
+            .then_with(|| entries[*a_idx].out.id.cmp(&entries[*b_idx].out.id)),
+    });
+
+    picked
+        .into_iter()
+        .take(limit)
+        .map(|(idx, _)| entries[idx].out.clone())
         .collect()
 }
 

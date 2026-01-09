@@ -1,3 +1,4 @@
+use crate::empty_query::EmptyQueryMode;
 use crate::models::DesktopEntryOut;
 use serde::{Deserialize, Serialize};
 
@@ -8,6 +9,8 @@ pub enum Request {
         roots: Vec<String>,
         query: String,
         limit: Option<usize>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        empty_mode: Option<EmptyQueryMode>,
     },
     /// Build (or ensure) the in-memory index for the given roots.
     Warmup {

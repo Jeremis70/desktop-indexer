@@ -1,6 +1,8 @@
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
+use crate::empty_query::EmptyQueryMode;
+
 #[derive(Parser, Debug)]
 #[command(name = "desktop-indexer")]
 #[command(about = "Index/search .desktop files (WIP)", long_about = None)]
@@ -29,6 +31,11 @@ pub enum Cmd {
         /// Max results to return (omit for unlimited)
         #[arg(long)]
         limit: Option<usize>,
+
+        /// When the query is empty/whitespace, return recent or frequent entries.
+        #[arg(long, value_enum, default_value_t = EmptyQueryMode::Recency)]
+        empty_mode: EmptyQueryMode,
+
         #[arg(long)]
         json: bool,
     },

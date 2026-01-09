@@ -216,6 +216,7 @@ fn handle_request(
             roots,
             query,
             limit,
+            empty_mode,
         } => {
             let Some(state) = ensure_index(indexes, &roots) else {
                 return (
@@ -230,12 +231,20 @@ fn handle_request(
             let qkey = query_key(&query);
             let tokens = crate::search::normalize_query(&query);
             if tokens.is_empty() {
-                return (
-                    Response::Entries {
-                        entries: Vec::new(),
-                    },
-                    false,
+                let mode = empty_mode.unwrap_or(crate::empty_query::EmptyQueryMode::Recency);
+                let entries = crate::search::search_entries_with_usage_map_and_empty_mode(
+                    &state.entries,
+                    "",
+                    lim,
+                    freqs.map(),
+                    mode,
                 );
+
+                state.last_tokens.clear();
+                state.last_candidates.clear();
+                state.last_query_key.clear();
+
+                return (Response::Entries { entries }, false);
             }
 
             // Incremental optimization: if the new query is a refinement of the previous

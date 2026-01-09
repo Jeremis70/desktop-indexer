@@ -13,9 +13,12 @@ pub fn run(cli: Cli) -> i32 {
         Cmd::Scan { limit, parse, json } => {
             commands::scan::scan(&scan_roots, *limit, *parse, *json)
         }
-        Cmd::Search { query, limit, json } => {
-            commands::search::search(&cli, &scan_roots, query, *limit, *json)
-        }
+        Cmd::Search {
+            query,
+            limit,
+            empty_mode,
+            json,
+        } => commands::search::search(&cli, &scan_roots, query, *limit, *empty_mode, *json),
         Cmd::List { json } => commands::list::list(&cli, &scan_roots, *json),
         Cmd::Parse { path, json } => commands::parse::parse(&scan_roots, path, *json),
         Cmd::Launch { desktop_id, action } => {
