@@ -43,7 +43,7 @@ pub enum Cmd {
     Launch {
         desktop_id: String,
 
-        /// Optional Desktop Action id (from [Desktop Action <id>])
+        /// Optional Desktop Action id (from the `[Desktop Action ...]` group)
         #[arg(long)]
         action: Option<String>,
     },
