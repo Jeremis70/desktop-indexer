@@ -29,6 +29,25 @@ pub fn normalize_query(query: &str) -> Vec<String> {
     tokens
 }
 
+pub fn norm_has_token_prefix(norm: &str, token: &str) -> bool {
+    if token.is_empty() {
+        return true;
+    }
+
+    if norm.starts_with(token) {
+        return true;
+    }
+
+    let bytes = norm.as_bytes();
+    for (idx, _) in norm.match_indices(token) {
+        if idx > 0 && bytes[idx - 1] == b' ' {
+            return true;
+        }
+    }
+
+    false
+}
+
 pub fn search_entries_with_usage_map_and_empty_mode(
     entries: &[DesktopEntryIndexed],
     query: &str,
@@ -55,7 +74,7 @@ pub fn search_entries_with_usage_map_and_empty_mode(
 
     'outer: for (idx, e) in entries.iter().enumerate() {
         for t in &tokens {
-            if !e.norm.contains(t) {
+            if !norm_has_token_prefix(&e.norm, t) {
                 continue 'outer;
             }
         }

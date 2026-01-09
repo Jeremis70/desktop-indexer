@@ -273,7 +273,9 @@ fn handle_request(
 
             candidates.retain(|&idx| {
                 let e = &state.entries[idx];
-                tokens.iter().all(|t| e.norm.contains(t))
+                tokens
+                    .iter()
+                    .all(|t| crate::search::norm_has_token_prefix(&e.norm, t))
             });
 
             // Score only within candidates (same scoring as search::search_entries).

@@ -37,6 +37,18 @@ Search apps (human output):
 desktop-indexer search "code"
 ```
 
+Empty query (show recent launches):
+
+```bash
+desktop-indexer search "" --limit 10
+```
+
+Empty query (show most frequent launches):
+
+```bash
+desktop-indexer search "" --empty-mode frequency --limit 10
+```
+
 Search apps (JSON):
 
 ```bash
@@ -93,6 +105,8 @@ Notes:
 
 - The client commands (`search`, `list`, `launch`) try the daemon first, then fall back to local execution.
 - `start-daemon` will also send a `warmup` request (unless `--no-daemon` is set) to avoid a first-search spike.
+- After upgrading/reinstalling the binary, restart the daemon so it uses the new version:
+	- `desktop-indexer stop-daemon && desktop-indexer start-daemon`
 
 ## IPC protocol (for QuickShell / custom clients)
 
@@ -119,6 +133,17 @@ Request examples:
 ```json
 {"cmd":"search","roots":["/home/me/.local/share/applications"],"query":"code","limit":20}
 ```
+
+Empty query (recency vs frequency):
+
+```json
+{"cmd":"search","roots":["/home/me/.local/share/applications"],"query":"","limit":20,"empty_mode":"recency"}
+```
+
+Where `empty_mode` is optional and can be:
+
+- `"recency"` (default)
+- `"frequency"`
 
 ```json
 {"cmd":"launch","roots":["/home/me/.local/share/applications"],"desktop_id":"code.desktop","action":null}
