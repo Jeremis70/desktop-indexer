@@ -1,0 +1,119 @@
+name: Rust CI
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+permissions:
+  contents: read
+
+jobs:
+  # Code formatting verification
+  format:
+    name: Format Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Rust
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        toolchain: stable
+        components: rustfmt
+
+    - name: Cache Rust build
+      uses: Swatinem/rust-cache@v2
+
+    - name: Check formatting
+      run: cargo fmt --all -- --check
+
+  # Linting with Clippy
+  clippy:
+    name: Clippy Lints
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Rust
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        toolchain: stable
+        components: clippy
+
+    - name: Cache Rust build
+      uses: Swatinem/rust-cache@v2
+
+    - name: Run Clippy
+      run: cargo clippy --all-targets --all-features -- -D warnings
+
+  # Security audit
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Run RustSec audit
+      uses: rustsec/audit-check@v2
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Build and tests on multiple platforms
+  test:
+    name: Test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        rust: [stable]
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Rust
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        toolchain: ${{ matrix.rust }}
+
+    - name: Cache Rust build
+      uses: Swatinem/rust-cache@v2
+
+    - name: Run tests
+      run: cargo test --all-features
+
+  # Documentation build
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Rust
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+
+    - name: Cache Rust build
+      uses: Swatinem/rust-cache@v2
+
+    - name: Build documentation
+      run: cargo doc --no-deps --all-features
+      env:
+        RUSTDOCFLAGS: -D warnings
+    
