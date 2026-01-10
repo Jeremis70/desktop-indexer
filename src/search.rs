@@ -158,7 +158,7 @@ pub fn score_entry(e: &DesktopEntryIndexed, tokens: &[String], usage: Usage, now
         let mut best: i32 = 0;
 
         if !name_lc.is_empty() {
-            if let Some(pos) = find_boundary_match(name_lc, t, &[b' ']) {
+            if let Some(pos) = find_boundary_match(name_lc, t, b" ") {
                 best = best.max(140 - (pos.min(80) as i32));
             } else if let Some(pos) = name_lc.find(t) {
                 best = best.max(80 - (pos.min(80) as i32));
@@ -166,7 +166,7 @@ pub fn score_entry(e: &DesktopEntryIndexed, tokens: &[String], usage: Usage, now
         }
 
         // Desktop IDs tend to have separators; treat them as boundaries.
-        if let Some(pos) = find_boundary_match(id_lc, t, &[b'-', b'_', b'.']) {
+        if let Some(pos) = find_boundary_match(id_lc, t, b"-_.") {
             best = best.max(110 - (pos.min(80) as i32));
         } else if let Some(pos) = id_lc.find(t) {
             best = best.max(60 - (pos.min(80) as i32));
@@ -179,7 +179,7 @@ pub fn score_entry(e: &DesktopEntryIndexed, tokens: &[String], usage: Usage, now
     if !name_lc.is_empty()
         && tokens
             .iter()
-            .all(|t| find_boundary_match(name_lc, t, &[b' ']).is_some())
+            .all(|t| find_boundary_match(name_lc, t, b" ").is_some())
     {
         relevance += 120;
     }
