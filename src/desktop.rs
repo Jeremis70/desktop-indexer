@@ -37,6 +37,7 @@ pub fn scan_desktop_files(scan_roots: &[PathBuf], limit: Option<usize>) -> ScanR
 pub fn scan_and_parse_desktop_files(
     scan_roots: &[PathBuf],
     limit: Option<usize>,
+    respect_try_exec: bool,
 ) -> ParsedScanResult {
     let t_scan = Instant::now();
     let (found_count, paths) = scan_desktop_paths(scan_roots, limit);
@@ -140,6 +141,21 @@ pub fn scan_and_parse_desktop_files(
             );
         }
 
+        let entries = if respect_try_exec {
+            entries
+                .into_iter()
+                .filter(|e| {
+                    e.out
+                        .try_exec
+                        .as_deref()
+                        .map(is_try_exec_available)
+                        .unwrap_or(true)
+                })
+                .collect()
+        } else {
+            entries
+        };
+
         return ParsedScanResult {
             scanned_roots: roots_key,
             found_count,
@@ -180,12 +196,93 @@ pub fn scan_and_parse_desktop_files(
         );
     }
 
+    let entries = if respect_try_exec {
+        entries
+            .into_iter()
+            .filter(|e| {
+                e.out
+                    .try_exec
+                    .as_deref()
+                    .map(is_try_exec_available)
+                    .unwrap_or(true)
+            })
+            .collect()
+    } else {
+        entries
+    };
+
     ParsedScanResult {
         scanned_roots: roots_key,
         found_count,
         parsed_count: entries.len(),
         parse_failed,
         entries,
+    }
+}
+
+fn is_try_exec_available(try_exec: &str) -> bool {
+    // Spec says TryExec is an executable name/path; some files might still include
+    // quoting or whitespace, so parse best-effort.
+    let cmd = shlex::split(try_exec)
+        .and_then(|mut v| v.drain(..1).next())
+        .unwrap_or_else(|| try_exec.trim().to_string());
+
+    if cmd.is_empty() {
+        return false;
+    }
+
+    // If it looks like a path, validate it as-is.
+    if cmd.contains('/') {
+        return is_executable_file(Path::new(&cmd));
+    }
+
+    is_executable_in_path(&cmd)
+}
+
+fn is_executable_in_path(name: &str) -> bool {
+    use std::env;
+
+    if name.is_empty() {
+        return false;
+    }
+
+    let Some(path_os) = env::var_os("PATH") else {
+        return false;
+    };
+
+    for dir in env::split_paths(&path_os) {
+        if dir.as_os_str().is_empty() {
+            continue;
+        }
+
+        let candidate = dir.join(name);
+        if is_executable_file(&candidate) {
+            return true;
+        }
+    }
+
+    false
+}
+
+fn is_executable_file(path: &Path) -> bool {
+    let Ok(meta) = std::fs::metadata(path) else {
+        return false;
+    };
+
+    if !meta.is_file() {
+        return false;
+    }
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = meta.permissions().mode();
+        mode & 0o111 != 0
+    }
+
+    #[cfg(not(unix))]
+    {
+        true
     }
 }
 

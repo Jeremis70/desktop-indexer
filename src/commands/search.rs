@@ -32,6 +32,7 @@ pub fn search(
             query: query.to_string(),
             limit,
             empty_mode: Some(empty_mode),
+            respect_try_exec: cli.respect_try_exec,
         })
     };
 
@@ -40,12 +41,12 @@ pub fn search(
             Response::Entries { entries } => ("daemon", entries),
             Response::Error { message } => {
                 eprintln!("desktop-indexer: daemon error: {message} (fallback local)");
-                local_search(scan_roots, query, limit, empty_mode)
+                local_search(scan_roots, query, limit, empty_mode, cli.respect_try_exec)
             }
-            _ => local_search(scan_roots, query, limit, empty_mode),
+            _ => local_search(scan_roots, query, limit, empty_mode, cli.respect_try_exec),
         }
     } else {
-        local_search(scan_roots, query, limit, empty_mode)
+        local_search(scan_roots, query, limit, empty_mode, cli.respect_try_exec)
     };
 
     trace(cli, &format!("mode={mode} (search)"));
@@ -67,8 +68,9 @@ fn local_search(
     query: &str,
     limit: Option<usize>,
     empty_mode: EmptyQueryMode,
+    respect_try_exec: bool,
 ) -> (&'static str, Vec<DesktopEntryOut>) {
-    let result = scan_and_parse_desktop_files(scan_roots, None);
+    let result = scan_and_parse_desktop_files(scan_roots, None, respect_try_exec);
     let freqs = FrequencyStore::load();
     let lim = limit.unwrap_or(20);
     (

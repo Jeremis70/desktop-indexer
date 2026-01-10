@@ -12,6 +12,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+type IndexKey = (Vec<String>, bool);
+
 struct IndexState {
     entries: Vec<crate::models::DesktopEntryIndexed>,
     last_tokens: Vec<String>,
@@ -110,7 +112,7 @@ pub fn run_daemon_foreground() -> std::io::Result<()> {
     let listener = UnixListener::bind(&path)?;
     eprintln!("desktop-indexer: daemon listening on {}", path.display());
 
-    let mut indexes: HashMap<Vec<String>, IndexState> = HashMap::new();
+    let mut indexes: HashMap<IndexKey, IndexState> = HashMap::new();
     let mut freqs = FrequencyStore::load();
 
     let mut shutdown = false;
@@ -141,7 +143,7 @@ pub fn run_daemon_foreground() -> std::io::Result<()> {
 
 fn handle_connection(
     stream: UnixStream,
-    indexes: &mut HashMap<Vec<String>, IndexState>,
+    indexes: &mut HashMap<IndexKey, IndexState>,
     freqs: &mut FrequencyStore,
 ) -> bool {
     let mut reader = BufReader::new(stream);
@@ -182,7 +184,7 @@ fn write_response(mut stream: UnixStream, resp: Response) -> std::io::Result<()>
 }
 
 fn handle_request(
-    indexes: &mut HashMap<Vec<String>, IndexState>,
+    indexes: &mut HashMap<IndexKey, IndexState>,
     freqs: &mut FrequencyStore,
     req: Request,
 ) -> (Response, bool) {
@@ -192,8 +194,11 @@ fn handle_request(
             (Response::Ok, true)
         }
 
-        Request::Warmup { roots } => {
-            if ensure_index(indexes, &roots).is_some() {
+        Request::Warmup {
+            roots,
+            respect_try_exec,
+        } => {
+            if ensure_index(indexes, &roots, respect_try_exec).is_some() {
                 (Response::Ok, false)
             } else {
                 (
@@ -217,8 +222,9 @@ fn handle_request(
             query,
             limit,
             empty_mode,
+            respect_try_exec,
         } => {
-            let Some(state) = ensure_index(indexes, &roots) else {
+            let Some(state) = ensure_index(indexes, &roots, respect_try_exec) else {
                 return (
                     Response::Error {
                         message: "failed to build index".to_string(),
@@ -311,8 +317,11 @@ fn handle_request(
             (Response::Entries { entries }, false)
         }
 
-        Request::List { roots } => {
-            let Some(state) = ensure_index(indexes, &roots) else {
+        Request::List {
+            roots,
+            respect_try_exec,
+        } => {
+            let Some(state) = ensure_index(indexes, &roots, respect_try_exec) else {
                 return (
                     Response::Error {
                         message: "failed to build index".to_string(),
@@ -336,8 +345,9 @@ fn handle_request(
             roots,
             desktop_id,
             action,
+            respect_try_exec,
         } => {
-            let Some(state) = ensure_index(indexes, &roots) else {
+            let Some(state) = ensure_index(indexes, &roots, respect_try_exec) else {
                 return (
                     Response::Error {
                         message: "failed to build index".to_string(),
@@ -360,14 +370,17 @@ fn handle_request(
 }
 
 fn ensure_index<'a>(
-    indexes: &'a mut HashMap<Vec<String>, IndexState>,
+    indexes: &'a mut HashMap<IndexKey, IndexState>,
     roots: &[String],
+    respect_try_exec: bool,
 ) -> Option<&'a mut IndexState> {
-    if !indexes.contains_key(roots) {
+    let key: IndexKey = (roots.to_vec(), respect_try_exec);
+
+    if !indexes.contains_key(&key) {
         let roots_pb: Vec<PathBuf> = roots.iter().map(PathBuf::from).collect();
-        let parsed = scan_and_parse_desktop_files(&roots_pb, None);
+        let parsed = scan_and_parse_desktop_files(&roots_pb, None, respect_try_exec);
         indexes.insert(
-            roots.to_vec(),
+            key.clone(),
             IndexState {
                 entries: parsed.entries,
                 last_tokens: Vec::new(),
@@ -376,7 +389,7 @@ fn ensure_index<'a>(
             },
         );
     }
-    indexes.get_mut(roots)
+    indexes.get_mut(&key)
 }
 
 fn do_launch(

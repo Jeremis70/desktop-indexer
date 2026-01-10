@@ -17,7 +17,10 @@ pub fn list(cli: &Cli, scan_roots: &[std::path::PathBuf], json: bool) -> i32 {
     let daemon_resp = if cli.no_daemon {
         None
     } else {
-        daemon_client::try_request(&Request::List { roots })
+        daemon_client::try_request(&Request::List {
+            roots,
+            respect_try_exec: cli.respect_try_exec,
+        })
     };
 
     let (mode, mut entries): (&str, Vec<DesktopEntryOut>) = if let Some(resp) = daemon_resp {
@@ -25,16 +28,16 @@ pub fn list(cli: &Cli, scan_roots: &[std::path::PathBuf], json: bool) -> i32 {
             Response::Entries { entries } => ("daemon", entries),
             Response::Error { message } => {
                 eprintln!("desktop-indexer: daemon error: {message} (fallback local)");
-                let result = scan_and_parse_desktop_files(scan_roots, None);
+                let result = scan_and_parse_desktop_files(scan_roots, None, cli.respect_try_exec);
                 ("local", result.entries.into_iter().map(|e| e.out).collect())
             }
             _ => {
-                let result = scan_and_parse_desktop_files(scan_roots, None);
+                let result = scan_and_parse_desktop_files(scan_roots, None, cli.respect_try_exec);
                 ("local", result.entries.into_iter().map(|e| e.out).collect())
             }
         }
     } else {
-        let result = scan_and_parse_desktop_files(scan_roots, None);
+        let result = scan_and_parse_desktop_files(scan_roots, None, cli.respect_try_exec);
         ("local", result.entries.into_iter().map(|e| e.out).collect())
     };
 

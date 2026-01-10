@@ -19,6 +19,7 @@ This project is designed to be used as a “launcher backend”: build an in-mem
 	- `--trace` prints whether a command ran via daemon or local fallback.
 	- `DESKTOP_INDEXER_TIMING=1` prints client timings to stderr.
 - Personalized ranking: persistent frequency + recency boosts based on successful launches.
+- Optional filtering of entries with `TryExec` missing (`--respect-try-exec`).
 
 ## Install
 
@@ -85,28 +86,42 @@ desktop-indexer scan --parse --json
 Start daemon in background:
 
 ```bash
-desktop-indexer start-daemon
+desktop-indexer daemon start
 ```
 
 Check status:
 
 ```bash
-desktop-indexer status
-desktop-indexer status --json
+desktop-indexer daemon status
+desktop-indexer daemon status --json
 ```
 
 Stop daemon:
 
 ```bash
+desktop-indexer daemon stop
+```
+
+Restart daemon (useful after upgrading the binary):
+
+```bash
+desktop-indexer daemon restart
+```
+
+Legacy commands (still supported):
+
+```bash
+desktop-indexer start-daemon
 desktop-indexer stop-daemon
+desktop-indexer status
 ```
 
 Notes:
 
 - The client commands (`search`, `list`, `launch`) try the daemon first, then fall back to local execution.
-- `start-daemon` will also send a `warmup` request (unless `--no-daemon` is set) to avoid a first-search spike.
+- `daemon start` will also send a `warmup` request (unless `--no-daemon` is set) to avoid a first-search spike.
 - After upgrading/reinstalling the binary, restart the daemon so it uses the new version:
-	- `desktop-indexer stop-daemon && desktop-indexer start-daemon`
+	- `desktop-indexer daemon restart`
 
 ## IPC protocol (for QuickShell / custom clients)
 
@@ -127,17 +142,17 @@ Request examples:
 ```
 
 ```json
-{"cmd":"warmup","roots":["/home/me/.local/share/applications","/usr/share/applications"]}
+{"cmd":"warmup","roots":["/home/me/.local/share/applications","/usr/share/applications"],"respect_try_exec":false}
 ```
 
 ```json
-{"cmd":"search","roots":["/home/me/.local/share/applications"],"query":"code","limit":20}
+{"cmd":"search","roots":["/home/me/.local/share/applications"],"query":"code","limit":20,"respect_try_exec":false}
 ```
 
 Empty query (recency vs frequency):
 
 ```json
-{"cmd":"search","roots":["/home/me/.local/share/applications"],"query":"","limit":20,"empty_mode":"recency"}
+{"cmd":"search","roots":["/home/me/.local/share/applications"],"query":"","limit":20,"empty_mode":"recency","respect_try_exec":false}
 ```
 
 Where `empty_mode` is optional and can be:
@@ -146,7 +161,7 @@ Where `empty_mode` is optional and can be:
 - `"frequency"`
 
 ```json
-{"cmd":"launch","roots":["/home/me/.local/share/applications"],"desktop_id":"code.desktop","action":null}
+{"cmd":"launch","roots":["/home/me/.local/share/applications"],"desktop_id":"code.desktop","action":null,"respect_try_exec":false}
 ```
 
 Response examples:
@@ -166,6 +181,7 @@ Response examples:
 Important integration detail:
 
 - The daemon caches indexes *by the exact `roots` list* (order matters). If you build your own client, keep the roots list consistent with the tool’s XDG logic to avoid building multiple indexes.
+- The daemon also keys indexes by `respect_try_exec` (so clients should keep it consistent too).
 
 ## Configuration
 
@@ -186,6 +202,7 @@ You can add extra scan roots with `-p/--path` (repeatable).
 
 - `--trace`: prints daemon vs local mode (stderr).
 - `--no-daemon`: forces local execution and skips daemon warmup.
+- `--respect-try-exec`: hide entries whose `.desktop` has `TryExec` but the executable is not available.
 
 ## Development
 

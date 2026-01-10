@@ -11,18 +11,34 @@ pub enum Request {
         limit: Option<usize>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         empty_mode: Option<EmptyQueryMode>,
+
+        /// If true, filter out entries whose TryExec is present but not available.
+        #[serde(default)]
+        respect_try_exec: bool,
     },
     /// Build (or ensure) the in-memory index for the given roots.
     Warmup {
         roots: Vec<String>,
+
+        /// If true, filter out entries whose TryExec is present but not available.
+        #[serde(default)]
+        respect_try_exec: bool,
     },
     List {
         roots: Vec<String>,
+
+        /// If true, filter out entries whose TryExec is present but not available.
+        #[serde(default)]
+        respect_try_exec: bool,
     },
     Launch {
         roots: Vec<String>,
         desktop_id: String,
         action: Option<String>,
+
+        /// If true, filter out entries whose TryExec is present but not available.
+        #[serde(default)]
+        respect_try_exec: bool,
     },
     Status,
 

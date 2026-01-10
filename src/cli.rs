@@ -3,6 +3,21 @@ use std::path::PathBuf;
 
 use crate::empty_query::EmptyQueryMode;
 
+#[derive(Subcommand, Debug)]
+pub enum DaemonCmd {
+    /// Start IPC daemon
+    Start,
+    /// Stop IPC daemon
+    Stop,
+    /// Restart IPC daemon (stop then start)
+    Restart,
+    /// Check daemon status
+    Status {
+        #[arg(long)]
+        json: bool,
+    },
+}
+
 #[derive(Parser, Debug)]
 #[command(name = "desktop-indexer")]
 #[command(about = "Index/search .desktop files (WIP)", long_about = None)]
@@ -18,6 +33,13 @@ pub struct Cli {
     /// Force local execution (do not use daemon)
     #[arg(long, global = true)]
     pub no_daemon: bool,
+
+    /// If set, hide entries whose TryExec is present but not available.
+    ///
+    /// This matches common desktop launcher behavior: TryExec is a presence check,
+    /// not an alternative Exec line.
+    #[arg(long, global = true)]
+    pub respect_try_exec: bool,
 
     #[command(subcommand)]
     pub cmd: Cmd,
@@ -75,6 +97,12 @@ pub enum Cmd {
 
         #[arg(long)]
         json: bool,
+    },
+
+    /// Manage IPC daemon (start/stop/restart/status)
+    Daemon {
+        #[command(subcommand)]
+        cmd: DaemonCmd,
     },
 
     /// Start IPC daemon

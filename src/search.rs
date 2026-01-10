@@ -144,38 +144,60 @@ fn empty_query_entries(
 }
 
 pub fn score_entry(e: &DesktopEntryIndexed, tokens: &[String], usage: Usage, now_sec: u64) -> i32 {
-    let mut score: i32 = 10;
+    let mut score: i32 = 0;
 
-    // Frequency boost (bounded so it doesn't dominate relevance).
-    // 0..20 => +0..80, 20+ saturates.
-    score += (usage.freq.min(20) as i32) * 4;
+    // Primary: textual relevance. This should dominate over usage for non-empty queries.
+    let mut relevance: i32 = 0;
 
-    // Recency boost (bounded).
-    // The goal is to break ties between similarly relevant results.
+    let name_lc = e.name_lc.as_deref().unwrap_or("");
+    let id_lc = e.id_lc.as_str();
+
+    // Per-token relevance: prefer boundary matches, and prefer earlier matches.
+    // This helps "browser" rank "Zen Browser" above e.g. "Avahi SSH Server Browser".
+    for t in tokens {
+        let mut best: i32 = 0;
+
+        if !name_lc.is_empty() {
+            if let Some(pos) = find_boundary_match(name_lc, t, &[b' ']) {
+                best = best.max(140 - (pos.min(80) as i32));
+            } else if let Some(pos) = name_lc.find(t) {
+                best = best.max(80 - (pos.min(80) as i32));
+            }
+        }
+
+        // Desktop IDs tend to have separators; treat them as boundaries.
+        if let Some(pos) = find_boundary_match(id_lc, t, &[b'-', b'_', b'.']) {
+            best = best.max(110 - (pos.min(80) as i32));
+        } else if let Some(pos) = id_lc.find(t) {
+            best = best.max(60 - (pos.min(80) as i32));
+        }
+
+        relevance += best;
+    }
+
+    // Bonus if all tokens match name at a boundary (strong signal).
+    if !name_lc.is_empty()
+        && tokens
+            .iter()
+            .all(|t| find_boundary_match(name_lc, t, &[b' ']).is_some())
+    {
+        relevance += 120;
+    }
+
+    // Small preference for shorter names when otherwise equal.
+    if !name_lc.is_empty() {
+        relevance += (30 - (name_lc.len().min(30) as i32)).max(0);
+    }
+
+    score += relevance;
+
+    // Secondary: usage (bounded, tie-breaker-ish).
+    // Keep this smaller than relevance so frequent but weak matches don't dominate.
+    score += (usage.freq.min(20) as i32) * 2;
     score += recency_bonus(usage.last_used, now_sec);
 
-    // Name boosts (avoid per-candidate allocations)
-    if let Some(name_lc) = e.name_lc.as_deref() {
-        let all_in_name = tokens.iter().all(|t| name_lc.contains(t));
-        if all_in_name {
-            score += 40;
-        }
-
-        if let Some(first) = tokens.first()
-            && name_lc.starts_with(first)
-        {
-            score += 30;
-        }
-    }
-
-    // id boost
-    if let Some(first) = tokens.first()
-        && e.id_lc.contains(first)
-    {
-        score += 15;
-    }
-
-    score
+    // Base constant so scores remain positive-ish and stable.
+    score + 10
 }
 
 fn recency_bonus(last_used: u64, now_sec: u64) -> i32 {
@@ -192,14 +214,37 @@ fn recency_bonus(last_used: u64, now_sec: u64) -> i32 {
     const MONTH: u64 = 30 * DAY;
 
     if age < HOUR {
-        30
-    } else if age < DAY {
-        20
-    } else if age < WEEK {
         10
+    } else if age < DAY {
+        7
+    } else if age < WEEK {
+        4
     } else if age < MONTH {
-        5
+        2
     } else {
         0
     }
+}
+
+fn find_boundary_match(haystack: &str, needle: &str, boundary_bytes: &[u8]) -> Option<usize> {
+    if needle.is_empty() {
+        return Some(0);
+    }
+
+    if haystack.starts_with(needle) {
+        return Some(0);
+    }
+
+    let bytes = haystack.as_bytes();
+    for (idx, _) in haystack.match_indices(needle) {
+        if idx == 0 {
+            return Some(0);
+        }
+        let prev = bytes.get(idx.wrapping_sub(1)).copied().unwrap_or(b' ');
+        if boundary_bytes.contains(&prev) {
+            return Some(idx);
+        }
+    }
+
+    None
 }

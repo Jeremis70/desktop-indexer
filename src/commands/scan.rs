@@ -7,9 +7,10 @@ pub fn scan(
     limit: Option<usize>,
     parse: bool,
     json: bool,
+    respect_try_exec: bool,
 ) -> i32 {
     if parse {
-        let result = scan_and_parse_desktop_files(scan_roots, limit);
+        let result = scan_and_parse_desktop_files(scan_roots, limit, respect_try_exec);
 
         if json {
             let entries: Vec<DesktopEntryOut> =

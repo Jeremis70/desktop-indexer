@@ -33,7 +33,10 @@ fn warmup_daemon(cli: &Cli, scan_roots: &[std::path::PathBuf]) {
         .map(|p| p.to_string_lossy().to_string())
         .collect();
 
-    let resp = daemon_client::try_request(&Request::Warmup { roots });
+    let resp = daemon_client::try_request(&Request::Warmup {
+        roots,
+        respect_try_exec: cli.respect_try_exec,
+    });
     if matches!(resp, Some(Response::Ok)) {
         trace(cli, "daemon warmup ok");
     } else {
@@ -66,6 +69,17 @@ pub fn stop_daemon(cli: &Cli) -> i32 {
             0
         }
     }
+}
+
+pub fn restart_daemon(cli: &Cli, scan_roots: &[std::path::PathBuf]) -> i32 {
+    // Best-effort stop; ignore failures and still attempt a start.
+    let _ = stop_daemon(cli);
+
+    // Give the old daemon a moment to release the socket.
+    // This is intentionally small to keep restart fast.
+    std::thread::sleep(std::time::Duration::from_millis(120));
+
+    start_daemon(cli, scan_roots)
 }
 
 pub fn run_daemon() -> i32 {

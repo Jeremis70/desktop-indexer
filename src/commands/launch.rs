@@ -24,6 +24,7 @@ pub fn launch(
             roots,
             desktop_id: desktop_id.to_string(),
             action: action.map(|s| s.to_string()),
+            respect_try_exec: cli.respect_try_exec,
         })
     {
         match resp {
@@ -48,7 +49,7 @@ pub fn launch(
 
     let mut freqs = FrequencyStore::load();
 
-    let result = scan_and_parse_desktop_files(scan_roots, None);
+    let result = scan_and_parse_desktop_files(scan_roots, None, cli.respect_try_exec);
     let entry = result.entries.iter().find(|e| e.out.id == id);
     let Some(entry) = entry else {
         eprintln!("Unknown desktop-id: {id}");
